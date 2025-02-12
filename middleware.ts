@@ -2,11 +2,16 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
-    const token = request.cookies.get('token')
-    const isApiRoute = request.nextUrl.pathname.startsWith('/api')
-    const isAuthRoute = request.nextUrl.pathname.startsWith('/auth')
+    // Auth routes should be publicly accessible
+    if (request.nextUrl.pathname.startsWith('/api/auth/')) {
+        return NextResponse.next()
+    }
 
-    if (!token && !isAuthRoute && isApiRoute) {
+    const token = request.cookies.get('token')
+    const isProtectedApiRoute = request.nextUrl.pathname.startsWith('/api/') &&
+        !request.nextUrl.pathname.startsWith('/api/auth/')
+
+    if (!token && isProtectedApiRoute) {
         return NextResponse.json(
             { error: 'Authentication required' },
             { status: 401 }
@@ -19,6 +24,6 @@ export function middleware(request: NextRequest) {
 export const config = {
     matcher: [
         '/api/:path*',
-        '/((?!_next/static|favicon.ico|logo.png|images|auth).*)'
+        '/((?!_next/static|favicon.ico|logo.png|images).*)'
     ]
 }
