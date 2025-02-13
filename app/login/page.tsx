@@ -10,20 +10,25 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { ModeToggle } from "@/components/theme-toggle"
+import { Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const { login } = useAuth()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
     try {
       await login(username, password)
       router.push("/dashboard")
     } catch (error) {
       console.error("Login failed:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -75,9 +80,14 @@ export default function LoginPage() {
               </div>
             </CardContent>
             <CardFooter className="flex flex-col">
-              <motion.div className="w-full" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button className="w-full" type="submit">
-                  Log in
+              <motion.div className="w-full" whileHover={!isLoading ? { scale: 1.05 } : {}} whileTap={!isLoading ? { scale: 0.95 } : {}}>
+                <Button className="w-full relative" type="submit" disabled={isLoading}>
+                  {isLoading && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  <span className={isLoading ? "opacity-70" : ""}>
+                    {isLoading ? "Signing in..." : "Log in"}
+                  </span>
                 </Button>
               </motion.div>
               <motion.p

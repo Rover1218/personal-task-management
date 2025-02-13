@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, Loader2, CheckCircle2, Circle } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 
@@ -24,6 +24,7 @@ type Task = {
   status: 'pending' | 'completed'
   priority: Priority
   dueDate: Date | null
+  completedAt?: Date // Add this new field
 }
 
 type DayPickerSelectHandler = (day: Date | undefined) => void;
@@ -33,6 +34,7 @@ export default function DashboardPage() {
   const [newTask, setNewTask] = useState("")
   const [newTaskPriority, setNewTaskPriority] = useState<Priority>("medium")
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | null>(null)
+  const [isCreatingTask, setIsCreatingTask] = useState(false)
   const { user, loading, logout } = useAuth()
   const router = useRouter()
 
@@ -57,6 +59,7 @@ export default function DashboardPage() {
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault()
     if (newTask.trim()) {
+      setIsCreatingTask(true)
       try {
         const res = await fetch('/api/tasks', {
           method: 'POST',
@@ -78,6 +81,8 @@ export default function DashboardPage() {
         }
       } catch (error) {
         console.error('Failed to add task:', error)
+      } finally {
+        setIsCreatingTask(false)
       }
     }
   }
@@ -86,16 +91,17 @@ export default function DashboardPage() {
     try {
       const task = tasks.find(t => t.id === id)
       const newStatus = task?.status === 'completed' ? 'pending' : 'completed'
+      const completedAt = newStatus === 'completed' ? new Date() : undefined
 
       const res = await fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: newStatus }),
+        body: JSON.stringify({ id, status: newStatus, completedAt }),
       })
 
       if (res.ok) {
         setTasks(tasks.map((task) =>
-          task.id === id ? { ...task, status: newStatus } : task
+          task.id === id ? { ...task, status: newStatus, completedAt } : task
         ))
       }
     } catch (error) {
@@ -132,6 +138,13 @@ export default function DashboardPage() {
 
   if (!user) {
     return null
+  }
+
+  // Add this function to disable past dates
+  const disablePastDates = (date: Date) => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return date < today
   }
 
   return (
@@ -172,11 +185,16 @@ export default function DashboardPage() {
                     placeholder="Enter a new task"
                     value={newTask}
                     onChange={(e) => setNewTask(e.target.value)}
+                    disabled={isCreatingTask}
                   />
                 </div>
                 <div>
                   <Label htmlFor="taskPriority">Priority</Label>
-                  <Select value={newTaskPriority} onValueChange={(value: Priority) => setNewTaskPriority(value)}>
+                  <Select
+                    value={newTaskPriority}
+                    onValueChange={(value: Priority) => setNewTaskPriority(value)}
+                    disabled={isCreatingTask}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
@@ -195,8 +213,9 @@ export default function DashboardPage() {
                         variant={"outline"}
                         className={cn(
                           "w-full justify-start text-left font-normal",
-                          !newTaskDueDate && "text-muted-foreground",
+                          !newTaskDueDate && "text-muted-foreground"
                         )}
+                        disabled={isCreatingTask}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {newTaskDueDate ? format(newTaskDueDate, "PPP") : <span>Pick a date</span>}
@@ -207,14 +226,23 @@ export default function DashboardPage() {
                         mode="single"
                         selected={newTaskDueDate || undefined}
                         onSelect={(day) => setNewTaskDueDate(day || null)}
+                        disabled={disablePastDates}
                         initialFocus
+                        fromDate={new Date()} // This ensures the calendar starts from today
                       />
                     </PopoverContent>
                   </Popover>
                 </div>
-                <Button type="submit" className="w-full">
-                  Add Task
-                </Button>
+                <motion.div whileHover={!isCreatingTask ? { scale: 1.01 } : {}} whileTap={!isCreatingTask ? { scale: 0.99 } : {}}>
+                  <Button type="submit" className="w-full relative" disabled={isCreatingTask || !newTask.trim()}>
+                    {isCreatingTask && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    <span className={isCreatingTask ? "opacity-70" : ""}>
+                      {isCreatingTask ? "Creating task..." : "Add Task"}
+                    </span>
+                  </Button>
+                </motion.div>
               </form>
             </CardContent>
           </Card>
@@ -238,36 +266,62 @@ export default function DashboardPage() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
                         transition={{ duration: 0.3 }}
-                        className="flex items-center justify-between p-2 bg-secondary rounded-md"
+                        className={cn(
+                          "flex items-center justify-between p-2 rounded-md",
+                          task.status === 'completed'
+                            ? "bg-secondary/50 border border-primary/20"
+                            : "bg-secondary"
+                        )}
                       >
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            checked={task.status === 'completed'}
-                            onChange={() => handleToggleTask(task.id)}
-                            className="rounded text-primary focus:ring-primary"
-                          />
-                          <span
-                            className={cn(
-                              task.status === 'completed' ? "line-through text-muted-foreground" : "",
-                              task.priority === "high"
-                                ? "text-red-500"
-                                : task.priority === "medium"
-                                  ? "text-yellow-500"
-                                  : "text-green-500",
-                            )}
+                        <div className="flex items-center space-x-3 flex-1">
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => handleToggleTask(task.id)}
+                            className="text-primary focus:outline-none"
                           >
-                            {task.title}
-                          </span>
-                          {task.dueDate && (
-                            <span className="text-sm text-muted-foreground">
-                              Due: {format(task.dueDate, "MMM d, yyyy")}
+                            {task.status === 'completed' ? (
+                              <CheckCircle2 className="h-5 w-5" />
+                            ) : (
+                              <Circle className="h-5 w-5" />
+                            )}
+                          </motion.button>
+                          <div className="flex flex-col flex-1">
+                            <span
+                              className={cn(
+                                "transition-all duration-200",
+                                task.status === 'completed' ? "line-through text-muted-foreground" : "",
+                                task.priority === "high"
+                                  ? "text-red-500"
+                                  : task.priority === "medium"
+                                    ? "text-yellow-500"
+                                    : "text-green-500"
+                              )}
+                            >
+                              {task.title}
                             </span>
-                          )}
+                            <div className="flex space-x-2 text-xs text-muted-foreground">
+                              {task.dueDate && (
+                                <span>
+                                  Due: {format(task.dueDate, "MMM d, yyyy")}
+                                </span>
+                              )}
+                              {task.status === 'completed' && task.completedAt && (
+                                <span>
+                                  • Completed: {format(new Date(task.completedAt), "MMM d, yyyy")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteTask(task.id)}
+                            className="ml-2"
+                          >
+                            Delete
+                          </Button>
                         </div>
-                        <Button variant="destructive" size="sm" onClick={() => handleDeleteTask(task.id)}>
-                          Delete
-                        </Button>
                       </motion.li>
                     ))}
                   </ul>

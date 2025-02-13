@@ -10,24 +10,29 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { ModeToggle } from "@/components/theme-toggle"
+import { Loader2 } from "lucide-react"
 
 export default function RegisterPage() {
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const { register } = useAuth()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setIsLoading(true)
 
     try {
       await register(username, email, password)
       router.push("/dashboard")
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Registration failed')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -45,7 +50,12 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit}>
             <CardContent>
               <div className="grid w-full items-center gap-4">
-                <div className="flex flex-col space-y-1.5">
+                <motion.div
+                  className="flex flex-col space-y-1.5"
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 }}
+                >
                   <Label htmlFor="username">Username</Label>
                   <Input
                     id="username"
@@ -53,9 +63,15 @@ export default function RegisterPage() {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     required
+                    disabled={isLoading}
                   />
-                </div>
-                <div className="flex flex-col space-y-1.5">
+                </motion.div>
+                <motion.div
+                  className="flex flex-col space-y-1.5"
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
@@ -64,9 +80,15 @@ export default function RegisterPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    disabled={isLoading}
                   />
-                </div>
-                <div className="flex flex-col space-y-1.5">
+                </motion.div>
+                <motion.div
+                  className="flex flex-col space-y-1.5"
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
                   <Label htmlFor="password">Password</Label>
                   <Input
                     id="password"
@@ -75,23 +97,42 @@ export default function RegisterPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    disabled={isLoading}
                   />
-                </div>
+                </motion.div>
                 {error && (
-                  <p className="text-sm text-red-500 text-center">{error}</p>
+                  <motion.p
+                    className="text-sm text-red-500 text-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    {error}
+                  </motion.p>
                 )}
               </div>
             </CardContent>
             <CardFooter className="flex flex-col">
-              <Button className="w-full" type="submit">
-                Register
-              </Button>
-              <p className="mt-4 text-sm text-center">
+              <motion.div className="w-full" whileHover={!isLoading ? { scale: 1.05 } : {}} whileTap={!isLoading ? { scale: 0.95 } : {}}>
+                <Button className="w-full relative" type="submit" disabled={isLoading}>
+                  {isLoading && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  <span className={isLoading ? "opacity-70" : ""}>
+                    {isLoading ? "Creating account..." : "Register"}
+                  </span>
+                </Button>
+              </motion.div>
+              <motion.p
+                className="mt-4 text-sm text-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+              >
                 Already have an account?{" "}
                 <Link href="/login" className="text-primary hover:underline">
                   Login
                 </Link>
-              </p>
+              </motion.p>
             </CardFooter>
           </form>
         </Card>
